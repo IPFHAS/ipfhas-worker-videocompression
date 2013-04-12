@@ -1,6 +1,7 @@
 package fr.tse.lt2c.satin.IpfhasWorkerVideoCompression;
 
 import java.io.File;
+import java.io.InputStream;
 import java.text.DecimalFormat;
 
 import org.gearman.GearmanFunction;
@@ -16,6 +17,11 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 	private static final Logger logger = LoggerFactory.getLogger(VideoCompression.class);
 
 	/**
+	 * Data received from the Gearman server
+	 */
+	private JSONObject dataJson;
+
+	/**
 	 * Video name
 	 */
 	private String videoName;
@@ -29,16 +35,21 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 	 * List of shots
 	 */
 	private JSONArray listShots;
-	
+
 	/**
 	 * Shot duration array
 	 */
 	private JSONArray listDuration;
-	
+
 	/**
 	 * Video Folder Path
 	 */
 	private File fileFolderPath;
+
+	/**
+	 * Compression modalities
+	 */
+	private JSONObject compressionMod;
 
 	public byte[] work(String function, byte[] data, GearmanFunctionCallback callback)
 			throws Exception {
@@ -46,7 +57,7 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 		try {
 			logger.info("----- in VideoCompression -----");
 
-			JSONObject dataJson = convertDataToJson(data);
+			dataJson = convertDataToJson(data);
 
 			logger.debug("dataJson received: {}", dataJson.toJSONString());
 
@@ -60,8 +71,23 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 					listShots.remove(i);
 				}
 			}
-			
+
 			logger.debug("listShots without Fade shots: {}", listShots);
+
+			createShotDurationArray();
+
+			VideoInitialization videoInit = new VideoInitialization();
+
+			fileFolderPath = new File(folderPath);
+			videoInit.createVideoFolder(fileFolderPath);
+
+			// Create the folders if they don't exist yet
+			String folderMovieCompressed = folderPath + "/" + videoName;
+			videoInit.createVideoFolder(new File(folderMovieCompressed));
+
+			compressionMod = (JSONObject) dataJson.get("compressionModalities");
+
+			logger.debug("compressionModalities: {}", compressionMod);
 
 			
 
@@ -113,31 +139,16 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 				listDuration.add(roundDouble(shotDuration, 2));
 			}
 
-			// Debug
 			logger.debug("listDuration: {}", listDuration.toJSONString());
 			logger.debug("listShots size: {}", listShots.size());
 			logger.debug("listDuration size: {}", listDuration.size());
-
-			// Video initialization
-			VideoInitialization videoInit = new VideoInitialization();
-			
-			fileFolderPath = new File(folderPath);
-			videoInit.createVideoFolder(fileFolderPath);
-			
-			// Create the folders if they don't exist yet
-			String folderMovieCompressed = folderPath + "/" + videoName;
-			videoInit.createVideoFolder(new File(folderMovieCompressed));
-
-			
-			
-
 		}
 		catch(Exception e) {
 			logger.error("BUG: {}", e);
 		}
 
 	}
-	
+
 	/**
 	 * Send the timecode into seconds
 	 * @param timecode
@@ -165,7 +176,7 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 			return 0;
 		}
 	}
-	
+
 	/**
 	 * Return a String of a rounded double
 	 * @param value to convert
@@ -187,5 +198,69 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 		}
 	}
 
+	/**
+	 * Bash command to launch the compression
+	 * @param videoPath
+	 * @param beginTime
+	 * @param xResolution
+	 * @param yResolution
+	 * @param bitrate
+	 * @param destination
+	 */
+	private void bash(String videoPath, String beginTime, String shotDuration, String xResolution, String yResolution, String bitrate, String destination) {
+		try {
+			logger.info("----- in bash -----");
 
+			String cmd = "ffmpeg -threads 4 -i " + videoPath +
+					" -ss " + beginTime + 
+					" -t " + shotDuration +
+					" -s " + xResolution + "x" + yResolution +
+					" -b " + bitrate + "k " +
+					" " + destination;
+			// Debug
+			logger.debug("bash command: {}", cmd);
+
+			// Call the bash
+			this.execBash(cmd);
+
+		}
+		catch(Exception e) {
+			logger.error("BUG: {}", e);
+		}
+	}
+
+	/**
+	 * Execute the bash command
+	 * @param cmd String of the command to to execute
+	 */
+	@SuppressWarnings("unused")
+	private void execBash(String cmd) {
+		try {
+			logger.info("IN EXECBASH");
+
+			ProcessBuilder pb = new ProcessBuilder("zsh", "-c", cmd);
+			pb.redirectErrorStream(true);
+			Process shell = pb.start();
+			InputStream shellIn = shell.getInputStream();
+			int shellExitStatus = shell.waitFor();
+			int c;
+			while((c = shellIn.read()) != -1) {
+				System.out.write(c);
+			}
+
+		}
+		catch(Exception e) {
+			logger.error("BUG: {}", e);
+
+		}
+	}
+
+	/**
+	 * 
+	 */
+	private void shotsCompression() {
+
+		
+
+	}
 }
