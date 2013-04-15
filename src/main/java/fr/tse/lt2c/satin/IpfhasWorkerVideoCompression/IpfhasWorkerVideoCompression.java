@@ -55,7 +55,7 @@ public class IpfhasWorkerVideoCompression {
 	/**
 	 * Folder Path
 	 */
-	protected static final String folderPath = "Videos";
+	protected static final String FOLDER_PATH = "Videos";
 
 	/**
 	 * Get the mongo connection
