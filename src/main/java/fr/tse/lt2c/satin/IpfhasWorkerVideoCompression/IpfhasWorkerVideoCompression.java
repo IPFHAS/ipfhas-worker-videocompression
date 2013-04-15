@@ -32,38 +32,11 @@ public class IpfhasWorkerVideoCompression {
 	 */
 	private static final int SERVER_PORT = 4730;
 
-	/** 
-	 * Mongo ip address
-	 */
-	private static final String MONGODB_ADDRESS = "localhost";
-
-	/**
-	 * Mongo database
-	 */
-	private static final String MONGODB_DB = "ipfhas";
-
-	/**
-	 * Mongo collection
-	 */
-	private static final String MONGODB_COLLECTION = "movies";
-
-	/**
-	 * MongoDb connection
-	 */
-	private static MongoDbConnection mongoConn;
 
 	/**
 	 * Folder Path
 	 */
 	protected static final String FOLDER_PATH = "Videos";
-
-	/**
-	 * Get the mongo connection
-	 * @return the mongoConn
-	 */
-	public static MongoDbConnection getMongoConn() {
-		return mongoConn;
-	}
 
 	/**
 	 * Gearman connection
@@ -87,12 +60,6 @@ public class IpfhasWorkerVideoCompression {
 		try {
 			// Info
 			logger.info("---- In IpfhasWorkerShotDetection ----");
-
-			// Connection to the Mongo Database
-			mongoConn = new MongoDbConnection(
-					MONGODB_ADDRESS,
-					MONGODB_DB,
-					MONGODB_COLLECTION);
 
 			//Worker declaration & connection to the Gearman Server
 			gearConnect = new GearmanConnection(
