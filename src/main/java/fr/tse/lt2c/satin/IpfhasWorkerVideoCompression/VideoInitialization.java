@@ -58,4 +58,46 @@ public class VideoInitialization extends VideoCompression {
 			return false;
 		}
 	}
+	
+	/**
+	 * Delete a folder
+	 * @param path Where the directory is
+	 */
+	public void deleteFolder(File path) {
+		try {
+			logger.info("IN DELETEFOLDER");
+			if(path.exists()){
+				deleteDir(path);
+			}
+		}
+		catch(Exception e) {
+			logger.error("BUG: {}", e);
+		}
+	}
+
+	/**
+	 * Navigate in the directory to find children and to delete them
+	 * @param dir Directory you want to delete
+	 * @return boolean
+	 */
+	private static boolean deleteDir(File dir) {
+		try {
+			logger.info("IN DELETEDIR");
+			if (dir.isDirectory()) {
+				String[] children = dir.list();
+				for (int i=0; i<children.length; i++) {
+					boolean success = deleteDir(new File(dir, children[i]));
+					if (!success) {
+						return false;
+					}
+				}
+			}
+		}
+		catch(Exception e) {
+			logger.error("BUG: {}", e);
+		}
+
+		// The directory is now empty so delete it
+		return dir.delete();
+	}
 }

@@ -39,7 +39,7 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 	/**
 	 * Shot duration array
 	 */
-	private JSONArray listDuration;
+	private JSONArray listDurations;
 
 	/**
 	 * Video Folder Path
@@ -50,11 +50,16 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 	 * Compression modalities
 	 */
 	private JSONArray compressionMod;
-	
+
+	/**
+	 * Bitrate / List shots
+	 */
+	private JSONObject modalitiesListShots;
+
 	/**
 	 * Name of video shots (returned if the worker finish his job)
 	 */
-	private JSONArray namesVideoShots;
+	private JSONArray listLocationVideoShots;
 
 	public byte[] work(String function, byte[] data, GearmanFunctionCallback callback)
 			throws Exception {
@@ -87,20 +92,45 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 			videoInit.createVideoFolder(fileFolderPath);
 
 			// Create the folders if they don't exist yet
-			String folderMovieCompressed = FOLDER_PATH + "/" + videoName;
-			videoInit.createVideoFolder(new File(folderMovieCompressed));
+			File folderMovieCompressed = new File(FOLDER_PATH + "/" + videoName);
+			if(folderMovieCompressed.exists()) {
+				videoInit.deleteFolder(folderMovieCompressed);
+			}
+			videoInit.createVideoFolder(folderMovieCompressed);
 
 			compressionMod = (JSONArray) dataJson.get("compressionModalities");
 
 			logger.debug("compressionModalities: {}", compressionMod);
 
+			modalitiesListShots = new JSONObject();
+
+			JSONArray list = new JSONArray();
+			listLocationVideoShots = new JSONArray();
+
 			for(int i=0; i< compressionMod.size(); i++) {
-				shotsCompression((JSONObject) compressionMod.get(i));
+				JSONObject mod = new JSONObject();
+				mod.put("modality", compressionMod.get(i));
+				shotsCompression(mod);
+				logger.debug("mod: {}", mod);
+				logger.debug("listLocationVideoShots: {}", listLocationVideoShots);
+				mod.put("listShots", listLocationVideoShots);
+				logger.debug("mod: {}", mod);
+				String copy = new String(mod.toJSONString());
+				list.add(copy);
+				listLocationVideoShots.clear();
 			}
 
-			JSONObject sendBack = new JSONObject();
-			sendBack.put("namesVideoShots", namesVideoShots);
+			logger.debug("list: {}", list);
 			
+			modalitiesListShots.put("modalitiesListShots", list);
+
+			logger.debug("modalitiesListShots: {}", modalitiesListShots);
+
+			JSONObject sendBack = modalitiesListShots;
+			sendBack.put("listDurations", listDurations);
+
+			logger.debug("sendBack: {}", sendBack);
+
 			return sendBack.toJSONString().getBytes();
 
 		}
@@ -140,7 +170,7 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 		try {
 			logger.info("----- in createShotDurationArray -----");
 
-			listDuration = new JSONArray();
+			listDurations = new JSONArray();
 
 			for(int i=0; i<listShots.size()-1; i++) {
 				double shotDuration = timecodeToSeconds(listShots.get(i+1).toString()) 
@@ -148,12 +178,12 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 
 				logger.debug("Duration for the Shot {}: {}", i+1, shotDuration);
 
-				listDuration.add(roundDouble(shotDuration, 2));
+				listDurations.add(roundDouble(shotDuration, 2));
 			}
 
-			logger.debug("listDuration: {}", listDuration.toJSONString());
+			logger.debug("listDuration: {}", listDurations.toJSONString());
 			logger.debug("listShots size: {}", listShots.size());
-			logger.debug("listDuration size: {}", listDuration.size());
+			logger.debug("listDuration size: {}", listDurations.size());
 		}
 		catch(Exception e) {
 			logger.error("Bub in createShotDurationArray: {}", e);
@@ -242,10 +272,10 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 
 		}
 		catch(Exception e) {
-			logger.error("BUG: {}", e);
+			logger.error("Bug in bash: {}", e);
 		}
 	}
-	
+
 	/**
 	 * Bash command to launch the compression
 	 * @param videoPath
@@ -272,7 +302,7 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 
 		}
 		catch(Exception e) {
-			logger.error("BUG: {}", e);
+			logger.error("Bug in bashEnd: {}", e);
 		}
 	}
 
@@ -307,23 +337,23 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 	 * 
 	 * @param modalities List of the compression modalities
 	 */
-	private void shotsCompression(JSONObject modalities) {
+	private int shotsCompression(JSONObject modalities) {
 
 		logger.debug("----- in shotsCompression -----");
 		logger.debug("Modalities to use: {}", modalities.toJSONString());
 
 		try {
-
-			logger.debug("xResolution: {}", modalities.get("xResolution").toString());
-			logger.debug("yResolution: {}", modalities.get("yResolution").toString());
-			logger.debug("bitrate: {}", modalities.get("bitrate").toString());
+			JSONObject modality = (JSONObject) modalities.get("modality");
+			logger.debug("xResolution: {}", modality.get("xResolution").toString());
+			logger.debug("yResolution: {}", modality.get("yResolution").toString());
+			logger.debug("bitrate: {}", modality.get("bitrate").toString());
 
 			String destination = fileFolderPath.getAbsolutePath() + "/" +
 					videoName +
 					"/mod_" + 
-					modalities.get("xResolution").toString() +
-					'_' + modalities.get("yResolution").toString() +
-					'_' + modalities.get("bitrate").toString();
+					modality.get("xResolution").toString() +
+					'_' + modality.get("yResolution").toString() +
+					'_' + modality.get("bitrate").toString();
 
 			logger.debug("Destination folder of shots: {}", destination);
 
@@ -333,74 +363,80 @@ public class VideoCompression extends IpfhasWorkerVideoCompression implements Ge
 				dest.mkdirs();
 				logger.debug("Shots folder created");
 			}
-			
+
 			String videoExtension = dataJson.get("videoExtension").toString();
-			
-			namesVideoShots = new JSONArray();
 
 			for(int i=0; i<=listShots.size()-1; i++) {
 
 				listShots.set(i, String.valueOf(timecodeToSeconds(listShots.get(i).toString())));
-				
+
 				if(i==0) {
 
 					logger.debug("in for loop 1 with i={}", i);
-					
+
 					String destination_0 = destination + "/" + videoName + "_" + i + "." + videoExtension;
-					
+
 					logger.debug("File destination: {}", destination_0);
-					
+
 					bash(videoAddress, "0", 
 							listShots.get(0).toString(), 
-							modalities.get("xResolution").toString(), 
-							modalities.get("yResolution").toString(),
-							modalities.get("bitrate").toString(),
+							modality.get("xResolution").toString(), 
+							modality.get("yResolution").toString(),
+							modality.get("bitrate").toString(),
 							destination_0);
-					
-					namesVideoShots.add(destination_0);
+
+					logger.debug("listLocationVideoShots: {}", listLocationVideoShots.toJSONString());
+					listLocationVideoShots.add(destination_0);
+					logger.debug("listLocationVideoShots: {}", listLocationVideoShots.toJSONString());
 				}
 
 				if(0<i && i<listShots.size()-1) {
-					
+
 					logger.debug("in for loop 2 with i={}", i);
-					
+
 					String destination_i = destination + "/" + videoName + "_" + i + "." + videoExtension;
-					
+
 					logger.debug("File destination: {}", destination_i);
-					
+
 					logger.debug("Begin Time: " + listShots.get(i-1).toString());
-					
+
 					bash(videoAddress, listShots.get(i-1).toString(),
-							listDuration.get(i-1).toString().replace(",", "."),
-							modalities.get("xResolution").toString(), 
-							modalities.get("yResolution").toString(),
-							modalities.get("bitrate").toString(),
+							listDurations.get(i-1).toString().replace(",", "."),
+							modality.get("xResolution").toString(), 
+							modality.get("yResolution").toString(),
+							modality.get("bitrate").toString(),
 							destination_i);	
-					
-					namesVideoShots.add(destination_i);
+
+					listLocationVideoShots.add(destination_i);
+					logger.debug("listLocationVideoShots: {}", listLocationVideoShots.toJSONString());
+
 				}
 
 				if(i==listShots.size()-1) {
-					
+
 					logger.debug("in for loop 3 with i={}", i);
-					
+
 					String destination_end = destination + "/" + videoName + "_" + i + "." + videoExtension;
-					
+
 					logger.debug("File destination: {}", destination_end);
-					
+
 					bashEnd(videoAddress, listShots.get(i-1).toString(),
-							modalities.get("xResolution").toString(), 
-							modalities.get("yResolution").toString(),
-							modalities.get("bitrate").toString(),
+							modality.get("xResolution").toString(), 
+							modality.get("yResolution").toString(),
+							modality.get("bitrate").toString(),
 							destination_end);
-					
-					namesVideoShots.add(destination_end);
+
+					listLocationVideoShots.add(destination_end);
+					logger.debug("listLocationVideoShots: {}", listLocationVideoShots.toJSONString());
+
 				}
 			}
 
+			return 1;
 		}
 		catch(Exception e) {
 			logger.error("Bug in shotCompression: {}", e);
+			return 0;
 		}
 
 

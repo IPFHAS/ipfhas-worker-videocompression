@@ -59,7 +59,7 @@ public class IpfhasWorkerVideoCompression {
 
 		try {
 			// Info
-			logger.info("---- In IpfhasWorkerShotDetection ----");
+			logger.info("---- In IpfhasWorkerVideoCompression ----");
 
 			//Worker declaration & connection to the Gearman Server
 			gearConnect = new GearmanConnection(
