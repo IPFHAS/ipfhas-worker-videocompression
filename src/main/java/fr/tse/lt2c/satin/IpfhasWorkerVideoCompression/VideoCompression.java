@@ -12,6 +12,12 @@ import org.json.simple.JSONValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Class for video compression
+ * 
+ * @author Antoine Lavignotte
+ * @version 1.0
+ */
 public class VideoCompression extends IpfhasWorkerVideoCompression implements GearmanFunction {
 
 	private static final Logger logger = LoggerFactory.getLogger(VideoCompression.class);
